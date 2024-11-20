@@ -12,7 +12,7 @@ def file_upload(bucket_name, source, destination):
         print("Error occurred:", e)
 
 bucket_name = "melb-gtfs"
-source = "/Users/vrajnena/Desktop/Melbourne_GTFS/fileupload/2/google_transit/"
+source = "fileupload/2/google_transit/"
 destination_prefix = "Metro/"  # GCS folder prefix
 
 for root, _, files in os.walk(source):
