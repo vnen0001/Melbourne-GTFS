@@ -1,6 +1,4 @@
 gtfs-venv/
-terraform.tfvars
-**/**/.ipynb
 infrastructure/**/.terraform/*
 infrastructure/**/*.tfstate
 infrastructure/**/*.tfstate.*
@@ -29,4 +27,8 @@ infrastructure/**/host_vars/vault.yml
 infrastructure/secrets.json
 # Keeping important Ansible files
 !infrastructure/**/ansible.cfg
-!infrastructure/ansible_automation_kafka/inventory.ini
+infrastructure/ansible_automation_kafka/inventory.ini
+testing.ipynb
+kafka-real-time/.env
+fileupload/.DS_Store   
+.DS_Store
