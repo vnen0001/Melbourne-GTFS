@@ -75,3 +75,50 @@ ${google_compute_instance.melb-gtfs-vm.network_interface[0].access_config[0].nat
 EOF
   filename = "${path.module}/ansible_automation_kafka/inventory.ini"
 }
+
+
+# a random suffix
+resource "random_id" "db-suffix" {
+  byte_length = 4
+}
+
+# Postgre instaance 
+resource "google_sql_database_instance" "postgres" {
+  name                = "postgres-instance-gtfs-${random_id.db-suffix.hex}"
+  database_version    = "POSTGRES_15"
+  region              = "us-central1"
+  deletion_protection = false
+  settings {
+    tier              = "db-f1-micro"
+    edition           = "ENTERPRISE"
+    availability_type = "ZONAL"
+    ip_configuration {
+      ipv4_enabled = true
+      authorized_networks {
+        name  = "my-local-ip"
+        value = "${var.my-local-ip}/32"
+      }
+      authorized_networks {
+        name  = "kafka-ip"
+        value = "${google_compute_instance.melb-gtfs-vm.network_interface[0].access_config[0].nat_ip}/32"
+      }
+
+    }
+
+  }
+}
+
+# Database
+resource "google_sql_database" "post-db" {
+  name = "gtfs-db"
+  instance = google_sql_database_instance.postgres.name
+  
+}
+
+# Database User
+resource "google_sql_user" "users" {
+  name = var.database-user
+  instance = google_sql_database_instance.postgres.name
+  password = var.database-password
+  
+}

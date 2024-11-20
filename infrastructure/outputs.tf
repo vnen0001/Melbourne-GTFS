@@ -10,3 +10,12 @@ output "ssh_user" {
 output "private_key_path" {
     value = var.ssh_key
 }
+
+
+output "database-ip" {
+    value =  google_sql_database_instance.postgres.public_ip_address
+}
+
+output "database-name" {
+    value = google_sql_database.post-db.name
+}

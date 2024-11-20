@@ -39,3 +39,15 @@ variable "ssh_key" {
 variable "ssh_user" {
     type = string  
 }
+
+variable "my-local-ip" {
+    type = string
+  
+}
+variable "database-user" {
+    type = string
+  
+}
+variable "database-password" {
+  type = string
+}
