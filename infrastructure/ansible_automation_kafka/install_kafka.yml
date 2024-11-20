@@ -1,0 +1,175 @@
+---
+- name: Kafka-installation
+  hosts: kafka
+  become: true
+  vars:
+    kafka_version: "3.9.0"
+    kafka_download_url: "https://dlcdn.apache.org/kafka/{{ kafka_version }}/kafka_2.13-{{ kafka_version }}.tgz"
+    kafka_install_dir: "/opt/kafka"
+    zookeeper_data_dir: "/var/lib/zookeeper"
+    kafka_user: "kafka"
+    kafka_extracted_dir: "{{ kafka_install_dir }}/kafka_2.13-{{ kafka_version }}"
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: true
+
+    - name: Install OpenJDK 11
+      apt:
+        name: openjdk-11-jdk
+        state: present
+
+    - name: Verify Java
+      command: java -version
+      register: java_version_output
+      ignore_errors: true
+
+    - name: Display Java Version
+      debug:
+        msg: "{{ java_version_output.stdout }}"
+
+    - name: Creating kafka group
+      group:
+        name: kafka
+        state: present
+
+    - name: Creating kafka User
+      user:
+        name: "{{ kafka_user }}"
+        group: kafka
+        shell: /bin/bash
+        system: yes
+        state: present
+
+    - name: Create Kafka installation directory
+      file:
+        path: "{{ kafka_install_dir }}"
+        state: directory
+        owner: "{{ kafka_user }}"
+        group: "{{ kafka_user }}"
+        mode: '0755'
+
+    - name: Clean up existing installation
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - "{{ kafka_install_dir }}/bin"
+        - "{{ kafka_install_dir }}/config"
+        - "{{ kafka_install_dir }}/libs"
+        - "{{ kafka_install_dir }}/licenses"
+        - "{{ kafka_install_dir }}/site-docs"
+
+    - name: Extract Kafka
+      unarchive:
+        src: "{{ kafka_download_url }}"
+        dest: "{{ kafka_install_dir }}"
+        remote_src: true
+        owner: "{{ kafka_user }}"
+        group: "{{ kafka_user }}"
+
+    - name: Synchronize Kafka files
+      shell: |
+        cp -rf {{ kafka_extracted_dir }}/* {{ kafka_install_dir }}/
+        rm -rf {{ kafka_extracted_dir }}
+      args:
+        creates: "{{ kafka_install_dir }}/bin/kafka-server-start.sh"
+
+    - name: Change Ownership
+      file:
+        path: "{{ kafka_install_dir }}"
+        owner: "{{ kafka_user }}"
+        group: "{{ kafka_user }}"
+        recurse: true
+        mode: '0755'
+
+    - name: Zookeeper Directory
+      file:
+        path: "{{ zookeeper_data_dir }}"
+        state: directory
+        owner: "{{ kafka_user }}"
+        group: "{{ kafka_user }}"
+        mode: '0755'
+
+    - name: Configure Zookeeper
+      copy:
+        dest: "{{ kafka_install_dir }}/config/zookeeper.properties"
+        content: |
+          dataDir={{ zookeeper_data_dir }}
+          clientPort=2181
+          maxClientCnxns=0
+        owner: "{{ kafka_user }}"
+        group: "{{ kafka_user }}"
+        mode: '0644'
+
+    - name: Configure kafka
+      copy:
+        dest: "{{ kafka_install_dir }}/config/server.properties"
+        content: |
+          broker.id=1
+          log.dirs=/tmp/kafka-logs
+          zookeeper.connect=localhost:2181
+        owner: "{{ kafka_user }}"
+        group: "{{ kafka_user }}"
+        mode: '0644'
+
+    - name: Create systemd service file for Zookeeper
+      copy:
+        dest: "/etc/systemd/system/zookeeper.service"
+        content: |
+          [Unit]
+          Description=Apache Zookeeper server
+          Documentation=http://zookeeper.apache.org
+          Requires=network.target remote-fs.target
+          After=network.target remote-fs.target
+
+          [Service]
+          Type=simple
+          User={{ kafka_user }}
+          Group={{ kafka_user }}
+          ExecStart={{ kafka_install_dir }}/bin/zookeeper-server-start.sh {{ kafka_install_dir }}/config/zookeeper.properties
+          ExecStop={{ kafka_install_dir }}/bin/zookeeper-server-stop.sh
+          Restart=on-abnormal
+
+          [Install]
+          WantedBy=multi-user.target
+        mode: '0644'
+
+    - name: Create systemd service file for Kafka
+      copy:
+        dest: "/etc/systemd/system/kafka.service"
+        content: |
+          [Unit]
+          Description=Apache Kafka Server
+          Documentation=http://kafka.apache.org/documentation.html
+          Requires=zookeeper.service
+          After=zookeeper.service
+
+          [Service]
+          Type=simple
+          User={{ kafka_user }}
+          Group={{ kafka_user }}
+          ExecStart={{ kafka_install_dir }}/bin/kafka-server-start.sh {{ kafka_install_dir }}/config/server.properties
+          ExecStop={{ kafka_install_dir }}/bin/kafka-server-stop.sh
+          Restart=on-abnormal
+
+          [Install]
+          WantedBy=multi-user.target
+        mode: '0644'
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Start and enable Zookeeper
+      systemd:
+        name: zookeeper
+        state: started
+        enabled: yes
+
+    - name: Start and enable Kafka
+      systemd:
+        name: kafka
+        state: started
+        enabled: yes
