@@ -1,0 +1,17 @@
+[Unit]
+Description=Apache Flink Session Cluster
+After=network.target
+
+[Service]
+Type=forking
+User={{ run_user }}
+Group={{ run_group }}
+Environment=FLINK_HOME={{ flink_dir }}
+Environment=JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+ExecStart={{ flink_dir }}/bin/start-cluster.sh
+ExecStop={{ flink_dir }}/bin/stop-cluster.sh
+Restart=always
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

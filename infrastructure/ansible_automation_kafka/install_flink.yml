@@ -1,0 +1,85 @@
+---
+- name: Flink-sql-installation
+  hosts: kafka
+  become: true
+  vars:
+    flink_version: "1.20.0"
+    scala_version: "2.12"
+    flink_download_url: "https://dlcdn.apache.org/flink/flink-{{ flink_version }}/flink-{{ flink_version }}-bin-scala_{{ scala_version }}.tgz"
+    flink_installation: "/opt/flink"
+    flink_dir: "{{ flink_installation }}/flink-{{ flink_version }}"
+    cluster_dir: "{{ flink_dir }}/bin/start-cluster.sh"
+    run_user: "vraj"  # Changed to your username
+    run_group: "vraj"  # Changed to your group
+
+  tasks:
+    - name: Stop existing Flink cluster if running
+      ansible.builtin.shell: "{{ cluster_dir }} stop"
+      ignore_errors: yes
+
+    - name: Set ownership of Flink directory
+      ansible.builtin.file:
+        path: "{{ flink_dir }}"
+        state: directory
+        owner: "{{ run_user }}"
+        group: "{{ run_group }}"
+        recurse: yes
+
+    - name: Set directory permissions
+      ansible.builtin.shell: "find {{ flink_dir }} -type d -exec chmod 755 {} \\;"
+
+    - name: Set file permissions
+      ansible.builtin.shell: "find {{ flink_dir }} -type f -exec chmod 644 {} \\;"
+
+    - name: Make scripts executable
+      ansible.builtin.file:
+        path: "{{ flink_dir }}/bin"
+        mode: '0755'
+        state: directory
+        recurse: yes
+
+    - name: Ensure log directory exists with proper permissions
+      ansible.builtin.file:
+        path: "{{ flink_dir }}/log"
+        state: directory
+        mode: '0766'
+        owner: "{{ run_user }}"
+        group: "{{ run_group }}"
+
+    - name: Remove existing log files
+      ansible.builtin.file:
+        path: "{{ flink_dir }}/log"
+        state: absent
+
+    - name: Create fresh log directory
+      ansible.builtin.file:
+        path: "{{ flink_dir }}/log"
+        state: directory
+        mode: '0766'
+        owner: "{{ run_user }}"
+        group: "{{ run_group }}"
+
+    - name: Start the Flink cluster
+      ansible.builtin.shell: "{{ cluster_dir }}"
+      become: yes
+      become_user: "{{ run_user }}"
+
+      
+    - name: Create Flink systemd service file
+      ansible.builtin.template:
+        src: flink.service.j2
+        dest: /etc/systemd/system/flink.service
+        mode: '0644'
+      notify: reload systemd
+
+    - name: Enable and start Flink service
+      ansible.builtin.systemd:
+        name: flink
+        state: started
+        enabled: yes
+        daemon_reload: yes
+
+  handlers:
+    - name: reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: yes
