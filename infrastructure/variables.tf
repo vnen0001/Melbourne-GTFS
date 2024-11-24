@@ -51,3 +51,7 @@ variable "database-user" {
 variable "database-password" {
   type = string
 }
+variable "authorized_networks" {
+    type = map(string)
+  
+}

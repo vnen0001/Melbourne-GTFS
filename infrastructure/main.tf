@@ -57,7 +57,7 @@ resource "google_compute_firewall" "default" {
   }
   allow {
     protocol = "tcp"
-    ports    = ["9092", "2181", "9093", "2888", "3888"] # kafka broker, zookeeper, additional, zookekeper quorum
+    ports    = ["22","9092", "2181", "9093", "2888", "3888"] # kafka broker, zookeeper, additional, zookekeper quorum
   }
   allow {
     protocol = "tcp"
@@ -83,28 +83,29 @@ resource "random_id" "db-suffix" {
 }
 
 # Postgre instaance 
+# PostgreSQL Instance
 resource "google_sql_database_instance" "postgres" {
   name                = "postgres-instance-gtfs-${random_id.db-suffix.hex}"
   database_version    = "POSTGRES_15"
-  region              = "us-central1"
+  region             = "us-central1"
   deletion_protection = false
+
   settings {
     tier              = "db-f1-micro"
     edition           = "ENTERPRISE"
     availability_type = "ZONAL"
+    
     ip_configuration {
       ipv4_enabled = true
-      authorized_networks {
-        name  = "my-local-ip"
-        value = "${var.my-local-ip}/32"
+      
+      dynamic "authorized_networks" {
+        for_each = var.authorized_networks
+        content {
+          name  = authorized_networks.key
+          value = authorized_networks.value
+        }
       }
-      authorized_networks {
-        name  = "kafka-ip"
-        value = "${google_compute_instance.melb-gtfs-vm.network_interface[0].access_config[0].nat_ip}/32"
-      }
-
     }
-
   }
 }
 
