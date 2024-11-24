@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from dotenv import load_dotenv
 import os
 
-load_dotenv("kafkasetup/config/.env")
+load_dotenv()
 @dataclass
 class KafkaConfig:
     bootstrap_servers: str = os.environ.get('bootstrap-server')
@@ -15,3 +15,8 @@ class DatabaseConfig:
     database: str =os.environ.get('databse-name')
     user: str = os.environ.get('databse-user')
     password: str = os.environ.get('databse-password')
+
+@dataclass
+class ApiConfig:
+    token:str = os.environ.get('api-token')
+    url:str = os.environ.get('api-url')
