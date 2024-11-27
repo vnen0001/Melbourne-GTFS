@@ -10,7 +10,7 @@ class KafkaConfig:
 
 @dataclass
 class DatabaseConfig:
-    databse_url: str = os.environ.get('database-server')
+    databse_url: str = os.environ.get('databse-server')
     port: str = '5432'
     database: str =os.environ.get('databse-name')
     user: str = os.environ.get('databse-user')
