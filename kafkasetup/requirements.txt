@@ -1,0 +1,4 @@
+kafka-python-ng
+six==1.16.0
+protobuf
+gtfs-realtime-bindings

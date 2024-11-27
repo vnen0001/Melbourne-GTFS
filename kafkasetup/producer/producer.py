@@ -6,22 +6,23 @@ import os
 import sys
 import time
 from datetime import datetime
-import schedule
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config.config import ApiConfig, KafkaConfig
+import logging
 from google.transit import gtfs_realtime_pb2
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.json_format import MessageToJson
 from google.protobuf.json_format import ParseDict
 from requests.adapters import HTTPAdapter, Retry
 from kafka.errors import TopicAlreadyExistsError
-import logging
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from kafkasetup.config.config import ApiConfig, KafkaConfig
+
 
 class GTFSKafkaProducer:
-    def __init__(self, check_interval: int = 30):  # 30 seconds default interval
-        self.check_interval = check_interval
+    def __init__(self):  # 30 seconds default interval
         self.last_processed_time = None
         self.producer = None
+        self.check_interval = 30  # Interval in seconds
         self.setup_logging()
 
     def setup_logging(self):
@@ -38,10 +39,10 @@ class GTFSKafkaProducer:
         if not KafkaConfig.bootstrap_servers:
             self.logger.critical('Kafka Bootstrap Server configuration is not found. Please check Kafka Config')
             return False
-    
+
         try:
             admin_client = KafkaAdminClient(
-                bootstrap_servers="35.208.38.25:9092",
+                bootstrap_servers=KafkaConfig.bootstrap_servers,
                 client_id='connection_checker'
             )
             topics = admin_client.list_topics()
@@ -55,7 +56,7 @@ class GTFSKafkaProducer:
     def create_topic(self, topic_name: str, replication=1, partition=1):
         try:
             admin = KafkaAdminClient(
-                bootstrap_servers="35.208.38.25:9092"
+                bootstrap_servers=KafkaConfig.bootstrap_servers
             )
 
             list_all_topics = admin.list_topics()
@@ -66,7 +67,7 @@ class GTFSKafkaProducer:
 
             topic = []
             topic.append(NewTopic(name=topic_name, num_partitions=partition, replication_factor=replication))
-            
+
             self.logger.info(f"Created new: {topic_name}")
             admin.create_topics(new_topics=topic, validate_only=False)
             admin.close()
@@ -92,19 +93,21 @@ class GTFSKafkaProducer:
                 "Cache-Control": "no-cache",
                 "Ocp-Apim-Subscription-Key": ApiConfig.token
             })
-            
+
             if response.status_code == 200:
                 self.logger.info(f'Response received: {response.status_code}')
                 feed = gtfs_realtime_pb2.FeedMessage()
                 feed.ParseFromString(response.content)
                 feedDict = MessageToDict(feed)
-                
+
                 if feedDict.get('entity'):
                     self.logger.info('Live updates found')
                     return feedDict.get('entity')
                 else:
                     self.logger.info('No live updates found')
-                    return None
+
+                    return {"Updates": 'No train services are live',
+                            "Time": str(datetime.now())}
             else:
                 self.logger.critical(f'Failed to receive response: {response.status_code}')
                 return None
@@ -130,7 +133,7 @@ class GTFSKafkaProducer:
             if not self.producer:
                 if not self.initialize_producer():
                     return "Failed to initialize producer"
-                
+
             future = self.producer.send(topic, message)
             record_metadata = future.get(timeout=10)
             return f"Message sent successfully to topic {topic} at partition {record_metadata.partition}, offset {record_metadata.offset}"
@@ -139,10 +142,10 @@ class GTFSKafkaProducer:
 
     def process_data(self):
         """
-        Main processing function that runs on schedule
+        Main processing function
         """
         self.logger.info("Starting data processing cycle...")
-        
+
         if not self.check_kafka():
             self.logger.error("Kafka connection failed")
             return
@@ -164,21 +167,19 @@ class GTFSKafkaProducer:
         """
         Start continuous processing
         """
-        self.logger.info(f"Starting GTFS data producer with {self.check_interval} second interval")
-        
-        # Schedule the job
-        schedule.every(self.check_interval).seconds.do(self.process_data)
-        
+        self.logger.info(f"Starting GTFS data producer")
+
         try:
             while True:
-                schedule.run_pending()
-                time.sleep(1)
+                self.process_data()
+                time.sleep(self.check_interval)  # Wait for the defined interval
         except KeyboardInterrupt:
             self.logger.info("Shutting down producer...")
             if self.producer:
                 self.producer.close()
             self.logger.info("Producer shutdown complete")
 
+
 if __name__ == "__main__":
-    producer = GTFSKafkaProducer(check_interval=30)  # Check every 30 seconds
+    producer = GTFSKafkaProducer()
     producer.start()
