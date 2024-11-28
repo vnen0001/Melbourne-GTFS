@@ -32,3 +32,13 @@ testing.ipynb
 kafka-real-time/.env
 fileupload/.DS_Store   
 .DS_Store
+kafkasetup/.astro/
+kafkasetup/.dockerignore
+kafkasetup/.env
+kafkasetup/Dockerfile
+kafkasetup/airflow_settings.yaml
+kafkasetup/config/.env
+kafkasetup/config/__pycache__/
+kafkasetup/dags/__pycache__/
+kafkasetup/database/__pycache__/
+kafkasetup/producer/logs/

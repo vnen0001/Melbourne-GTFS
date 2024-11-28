@@ -192,7 +192,7 @@ weekday_task = PythonOperator(
 weekend_dag = DAG(
     'weekend_schedule',
     default_args=default_args,
-    description='Weekend schedule - every 5 minutes all day',
+    description='Weekend schedule - every 2 minutes all day',
     schedule_interval='*/5 * * * 0,6',  # Every 5 minutes, all day, Sat-Sun
     start_date=days_ago(1),
     catchup=False
